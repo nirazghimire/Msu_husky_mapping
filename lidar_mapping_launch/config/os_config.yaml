@@ -1,0 +1,16 @@
+# os_config.yaml
+
+os_sensor:
+  ros__parameters:
+    sensor_hostname: "os-122512000887.local"          #  IP address of the Ouster sensor
+    udp_dest: "192.168.1.10"                #  IP address of the Husky (
+    lidar_mode: "1024x10"                   
+    timestamp_mode: "TIME_FROM_PTP_1588"  # Choose time source (often used: TIME_FROM_INTERNAL_OSC or TIME_FROM_PTP_1588)
+
+    metadata: ""                            
+    use_system_default_qos: true
+
+    frame_id: "os_sensor"                   # The frame that LiDAR publishes
+    imu_frame_id: "os_imu"
+    lidar_frame_id: "os_lidar"
+    tf_base_frame: "base_link"              # Your robot’s base frame

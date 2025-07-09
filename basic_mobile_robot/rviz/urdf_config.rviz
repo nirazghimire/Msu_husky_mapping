@@ -1,0 +1,11 @@
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz/RobotModel
+      Name: Robot Model
+      Enabled: true
+      Robot Description: robot_description
+      Visual Enabled: true
+      Collision Enabled: false
+      Alpha: 1.0
+
