@@ -1,0 +1,6 @@
+[submodule "ouster-ros"]
+	path = ouster-ros
+	url = https://github.com/ouster-lidar/ouster-ros.git
+[submodule "LIO-SAM"]
+	path = LIO-SAM
+	url = https://github.com/LIO-SAM/LIO-SAM.git
