@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiDAR Object Detection - Complete Setup Guide</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #2980b9;
+            margin-top: 40px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+        }
+        h3 {
+            color: #27ae60;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        pre code {
+            background: transparent;
+            color: #f8f8f2;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background: #3498db;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        .note {
+            background: #e7f3ff;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .architecture {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre;
+        }
+        @media print {
+            body { padding: 20px; }
+            pre { white-space: pre-wrap; }
+        }
+    </style>
+</head>
+<body>
+
+<h1>🔍 LiDAR Object Detection - Complete Setup Guide</h1>
+
+<p>This guide explains how to run real-time 3D object detection on the Ouster LiDAR using a CPU-only laptop. The system uses PointPillars (an AI model) to detect cars, pedestrians, and cyclists.</p>
+
+<hr>
+
+<h2>📋 Table of Contents</h2>
+<ol>
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#hardware">Hardware Requirements</a></li>
+    <li><a href="#software">Software Requirements</a></li>
+    <li><a href="#quickstart">Quick Start</a></li>
+    <li><a href="#howitworks">How It Works</a></li>
+    <li><a href="#configuration">Configuration</a></li>
+    <li><a href="#troubleshooting">Troubleshooting</a></li>
+    <li><a href="#limitations">Known Limitations</a></li>
+</ol>
+
+<hr>
+
+<h2 id="overview">📖 Overview</h2>
+
+<p>This package detects objects in 3D LiDAR point clouds in real-time. It works <strong>without a GPU</strong> (runs on CPU only).</p>
+
+<p><strong>What it detects:</strong></p>
+<ul>
+    <li>🚗 Cars</li>
+    <li>🚶 Pedestrians</li>
+    <li>🚴 Cyclists</li>
+</ul>
+
+<table>
+    <tr>
+        <th>Input</th>
+        <td>Point cloud from Ouster LiDAR (<code>/ouster/points</code>)</td>
+    </tr>
+    <tr>
+        <th>Output</th>
+        <td>3D bounding boxes as ROS2 markers (<code>/detections</code>)</td>
+    </tr>
+</table>
+
+<hr>
+
+<h2 id="hardware">🔧 Hardware Requirements</h2>
+
+<ul>
+    <li><strong>Ouster LiDAR</strong> (tested with OS-1-64)</li>
+    <li><strong>Laptop/PC</strong> with at least 8GB RAM</li>
+    <li><strong>Network connection</strong> to the LiDAR (Ethernet)</li>
+</ul>
+
+<hr>
+
+<h2 id="software">💻 Software Requirements</h2>
+
+<ul>
+    <li>Ubuntu 22.04</li>
+    <li>ROS2 Humble</li>
+    <li>Python 3.10</li>
+    <li>PyTorch (CPU version)</li>
+    <li>OpenPCDet (patched for CPU)</li>
+</ul>
+
+<p>All dependencies should already be installed in the <code>venv_ros2</code> virtual environment.</p>
+
+<hr>
+
+<h2 id="quickstart">🚀 Quick Start</h2>
+
+<h3>Step 1: Open 3 Terminals</h3>
+
+<p>You need 3 terminal windows. In each terminal, first activate the environment:</p>
+
+<pre><code>source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash</code></pre>
+
+<h3>Step 2: Start the Ouster Driver (Terminal 1)</h3>
+
+<p>This connects to the physical LiDAR and publishes point clouds:</p>
+
+<pre><code>ros2 launch ouster_ros sensor.launch.xml sensor_hostname:=os-122512000887.local viz:=false</code></pre>
+
+<div class="note">
+    <strong>Note:</strong> Replace <code>os-122512000887.local</code> with your LiDAR's hostname if different.
+</div>
+
+<p>Wait until you see: <code>Sensor configured successfully</code></p>
+
+<h3>Step 3: Start the Detection Node (Terminal 2)</h3>
+
+<p>This runs the AI model and publishes detections:</p>
+
+<pre><code>ros2 launch lidar_object_detection detection.launch.py</code></pre>
+
+<p>You should see:</p>
+<pre><code>✅ OpenPCDet model loaded on CPU
+📊 Points: 50000 total, 26000 in detect range | X:[-7.0,3.0] ...
+🔍 Raw predictions: 2 boxes
+Published 2 detections (Threshold: 0.1)</code></pre>
+
+<h3>Step 4: Visualize in RViz2 (Terminal 3)</h3>
+
+<pre><code>rviz2</code></pre>
+
+<p>In RViz2:</p>
+<ol>
+    <li>Set <strong>Fixed Frame</strong> to <code>os_lidar</code></li>
+    <li>Click <strong>Add</strong> → <strong>PointCloud2</strong> → Topic: <code>/ouster/points</code></li>
+    <li>Click <strong>Add</strong> → <strong>MarkerArray</strong> → Topic: <code>/detections</code></li>
+</ol>
+
+<p>You should now see the point cloud and bounding boxes!</p>
+
+<hr>
+
+<h2 id="howitworks">⚙️ How It Works</h2>
+
+<h3>Architecture</h3>
+
+<div class="architecture">
+┌─────────────────┐     ┌──────────────────────┐     ┌─────────────┐
+│  Ouster LiDAR   │────▶│  lidar_detection_node │────▶│   RViz2     │
+│  (Hardware)     │     │  (PointPillars AI)    │     │   (Display) │
+└─────────────────┘     └──────────────────────┘     └─────────────┘
+        │                         │
+        ▼                         ▼
+  /ouster/points            /detections
+  (PointCloud2)             (MarkerArray)
+</div>
+
+<h3>Key Files</h3>
+
+<table>
+    <tr>
+        <th>File</th>
+        <th>Purpose</th>
+    </tr>
+    <tr>
+        <td><code>src/lidar_object_detection/</code></td>
+        <td>Main detection package</td>
+    </tr>
+    <tr>
+        <td><code>src/lidar_object_detection/lidar_object_detection/detection_node.py</code></td>
+        <td>Detection node code</td>
+    </tr>
+    <tr>
+        <td><code>src/lidar_object_detection/config/pointpillar.yaml</code></td>
+        <td>Model configuration</td>
+    </tr>
+    <tr>
+        <td><code>src/OpenPCDet_backup/</code></td>
+        <td>Patched OpenPCDet (CPU-only)</td>
+    </tr>
+    <tr>
+        <td><code>src/OpenPCDet_backup/pretrained_models/pointpillar_7728.pth</code></td>
+        <td>Pretrained model weights</td>
+    </tr>
+</table>
+
+<h3>Coordinate Transformation</h3>
+
+<p>The PointPillars model was trained on KITTI dataset (forward-facing car camera). It expects objects in front of the sensor (positive X direction).</p>
+
+<p>However, the Ouster LiDAR sees 360° around itself, with points in both positive and negative X.</p>
+
+<p>To make detection work, the code:</p>
+<ol>
+    <li>Shifts all points by +35 meters on X axis (into KITTI range)</li>
+    <li>Runs AI inference</li>
+    <li>Shifts detection boxes back by -35 meters (to original positions)</li>
+</ol>
+
+<p>This is handled automatically in <code>detection_node.py</code>.</p>
+
+<hr>
+
+<h2 id="configuration">🔧 Configuration</h2>
+
+<h3>Detection Threshold</h3>
+
+<p>To reduce false positives, you can adjust the detection threshold.</p>
+
+<p>In <code>detection_node.py</code>, find this line:</p>
+<pre><code>DETECTION_THRESHOLD = 0.1  # Lowered from 0.25 for debugging</code></pre>
+
+<p>Change to a higher value (e.g., 0.25 or 0.3) for fewer but more confident detections.</p>
+
+<h3>Point Cloud Range</h3>
+
+<p>The detection only considers points within this range:</p>
+<pre><code>POINT_CLOUD_RANGE = [0, -39.68, -3, 69.12, 39.68, 1]
+# [x_min, y_min, z_min, x_max, y_max, z_max]</code></pre>
+
+<p>After the X offset is applied, this becomes approximately:</p>
+<ul>
+    <li>X: -35 to +34 meters (from sensor)</li>
+    <li>Y: -40 to +40 meters</li>
+    <li>Z: -3 to +1 meters (height)</li>
+</ul>
+
+<hr>
+
+<h2 id="troubleshooting">🔧 Troubleshooting</h2>
+
+<h3>Problem: No point cloud in RViz2</h3>
+
+<p><strong>Check:</strong> Is the Ouster driver running?</p>
+<pre><code>ros2 topic list | grep ouster</code></pre>
+<p>Should show <code>/ouster/points</code></p>
+
+<p><strong>Check:</strong> Is the Fixed Frame correct?</p>
+<p>Set it to <code>os_lidar</code> in RViz2</p>
+
+<h3>Problem: 0 detections / 0 raw predictions</h3>
+
+<p><strong>Check 1:</strong> Are points being received?</p>
+<p>Look for: <code>📊 Points: X total, Y in detect range</code></p>
+<ul>
+    <li>If X is 0, the detection node isn't receiving data</li>
+    <li>If Y is very low, most points are outside detection range</li>
+</ul>
+
+<p><strong>Check 2:</strong> QoS compatibility</p>
+<p>The detection node uses BEST_EFFORT QoS. If you see warnings about "incompatible QoS", there's a mismatch.</p>
+
+<h3>Problem: Detection boxes appear in wrong location</h3>
+
+<p><strong>Check:</strong> Make sure the X_OFFSET transformation is applied both:</p>
+<ol>
+    <li>Before voxelization (shift points)</li>
+    <li>After detection (shift boxes back)</li>
+</ol>
+
+<h3>Problem: Model won't load / CUDA errors</h3>
+
+<p>The code is patched to run on CPU. If you see CUDA errors, check that:</p>
+<ul>
+    <li><code>src/OpenPCDet_backup/</code> is being used (not <code>src/OpenPCDet</code>)</li>
+    <li>The <code>to_cpu=True</code> flag is set when loading model weights</li>
+</ul>
+
+<hr>
+
+<h2 id="limitations">⚠️ Known Limitations</h2>
+
+<h3>1. Only Detects Cars, Pedestrians, Cyclists</h3>
+<p>The model was trained on KITTI (outdoor driving data). It will NOT detect: furniture, animals, drones, or indoor objects.</p>
+
+<h3>2. False Positives Indoors</h3>
+<p>Indoor structures (walls, desks, shelves) may be detected as "Car" because they have similar shapes.</p>
+
+<h3>3. Slow on CPU</h3>
+<p>Detection runs at ~0.5 FPS on CPU. This is expected. For real-time performance, you would need a GPU.</p>
+
+<h3>4. Limited Detection Range</h3>
+<p>Objects beyond ~35 meters may not be detected well.</p>
+
+<h3>5. Height Cutoff</h3>
+<p>Objects taller than ~1 meter above the sensor may be partially cut off due to Z range limits.</p>
+
+<hr>
+
+<h2>📦 Testing with Recorded Data</h2>
+
+<p>If you don't have the physical LiDAR available, you can test with a recorded rosbag:</p>
+
+<pre><code># Terminal 1: Detection node
+ros2 launch lidar_object_detection detection.launch.py
+
+# Terminal 2: Play rosbag
+ros2 bag play ~/ros2_ws/rosbag2_2025_08_15-14_03_09 --clock</code></pre>
+
+<hr>
+
+<h2>🔨 Building After Code Changes</h2>
+
+<p>If you modify the Python code:</p>
+
+<pre><code>cd ~/ros2_ws
+source /opt/ros/humble/setup.bash
+colcon build --packages-select lidar_object_detection --symlink-install
+source install/setup.bash</code></pre>
+
+<hr>
+
+<h2>📚 Contact & References</h2>
+
+<ul>
+    <li><strong>OpenPCDet:</strong> <a href="https://github.com/open-mmlab/OpenPCDet">https://github.com/open-mmlab/OpenPCDet</a></li>
+    <li><strong>PointPillars Paper:</strong> <a href="https://arxiv.org/abs/1812.05784">https://arxiv.org/abs/1812.05784</a></li>
+    <li><strong>KITTI Dataset:</strong> <a href="http://www.cvlibs.net/datasets/kitti/">http://www.cvlibs.net/datasets/kitti/</a></li>
+</ul>
+
+<hr>
+
+<p><em>Last Updated: January 2026</em></p>
+
+</body>
+</html>
