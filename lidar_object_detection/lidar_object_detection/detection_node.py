@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from sensor_msgs.msg import PointCloud2
 from visualization_msgs.msg import Marker, MarkerArray
 from builtin_interfaces.msg import Duration
@@ -25,19 +25,41 @@ def yaw_to_quaternion(yaw):
     return [np.cos(yaw / 2), 0, 0, np.sin(yaw / 2)]
 
 def pointcloud2_to_array(cloud_msg):
-    fmt = 'ffff'
+    """Parse Ouster PointCloud2 format: x(0), y(4), z(8), [gap], intensity(16)"""
     points = []
-    for i in range(0, len(cloud_msg.data), cloud_msg.point_step):
-        x, y, z, intensity = struct.unpack_from(fmt, cloud_msg.data, i)
-        points.append([x, y, z, intensity])
-    return np.array(points, dtype=np.float32)
+    point_step = cloud_msg.point_step
+    
+    # Ouster format: x at 0, y at 4, z at 8, intensity at 16 (all float32 = datatype 7)
+    for i in range(0, len(cloud_msg.data), point_step):
+        try:
+            x = struct.unpack_from('f', cloud_msg.data, i + 0)[0]
+            y = struct.unpack_from('f', cloud_msg.data, i + 4)[0]
+            z = struct.unpack_from('f', cloud_msg.data, i + 8)[0]
+            intensity = struct.unpack_from('f', cloud_msg.data, i + 16)[0]
+            
+            # Skip invalid points (NaN or inf)
+            if np.isfinite(x) and np.isfinite(y) and np.isfinite(z):
+                points.append([x, y, z, intensity if np.isfinite(intensity) else 0.0])
+        except struct.error:
+            continue
+    
+    return np.array(points, dtype=np.float32) if points else np.zeros((0, 4), dtype=np.float32)
+
+# Original KITTI detection range
+POINT_CLOUD_RANGE = [0, -39.68, -3, 69.12, 39.68, 1]
+VOXEL_SIZE = [0.16, 0.16, 4]
+GRID_SIZE = [432, 496, 1]
+
+# Transform points to KITTI range: shift X so that points fall within [0, 69.12]
+# Your LiDAR sees mostly negative X, shift by +35 to center in detection range
+X_OFFSET = 35.0
 
 class DummyDataset:
     def __init__(self, class_names):
         self.class_names = class_names
-        self.point_cloud_range = np.array([0, -39.68, -3, 69.12, 39.68, 1])
-        self.voxel_size = np.array([0.16, 0.16, 4])
-        self.grid_size = np.array([432, 496, 1])
+        self.point_cloud_range = np.array(POINT_CLOUD_RANGE)
+        self.voxel_size = np.array(VOXEL_SIZE)
+        self.grid_size = np.array(GRID_SIZE)
         self.depth_downsample_factor = None
         self.point_feature_encoder = type('FeatureEncoder', (object,), {'num_point_features': 4})() # Mock
 
@@ -56,10 +78,10 @@ class LidarDetectionNode(Node):
         self.model.load_params_from_file(filename=ckpt_file, logger=self.get_logger(), to_cpu=True)
         self.model.to(self.device).eval()
 
-        # Voxel Generator
+        # Voxel Generator - 360° range for Ouster LiDAR
         self.voxel_generator = sputils.PointToVoxel(
-            vsize_xyz=[0.16, 0.16, 4],
-            coors_range_xyz=[0, -39.68, -3, 69.12, 39.68, 1],
+            vsize_xyz=VOXEL_SIZE,
+            coors_range_xyz=POINT_CLOUD_RANGE,
             num_point_features=4,
             max_num_voxels=40000,
             max_num_points_per_voxel=32,
@@ -68,12 +90,19 @@ class LidarDetectionNode(Node):
 
         self.get_logger().info("✅ OpenPCDet model loaded on CPU")
 
-        # Use SensorDataQoS (BEST_EFFORT) to match typical LiDAR/bag publisher policies
+        # Create QoS profile matching Ouster driver (BEST_EFFORT reliability)
+        qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.VOLATILE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10
+        )
+        
         self.subscription = self.create_subscription(
             PointCloud2, 
             '/ouster/points', 
             self.pointcloud_callback, 
-            qos_profile=qos_profile_sensor_data
+            qos_profile=qos
         )
         self.publisher = self.create_publisher(MarkerArray, '/detections', 10)
 
@@ -82,8 +111,26 @@ class LidarDetectionNode(Node):
         if points.shape[0] == 0:
             return
 
-        # Voxelization
-        points_tensor = torch.from_numpy(points).float().to(self.device)
+        # Debug: show point cloud stats
+        x_min, y_min, z_min = points[:, 0].min(), points[:, 1].min(), points[:, 2].min()
+        x_max, y_max, z_max = points[:, 0].max(), points[:, 1].max(), points[:, 2].max()
+        
+        # Check how many points are within detection range
+        pcr = POINT_CLOUD_RANGE
+        in_range = (points[:, 0] >= pcr[0]) & (points[:, 0] <= pcr[3]) & \
+                   (points[:, 1] >= pcr[1]) & (points[:, 1] <= pcr[4]) & \
+                   (points[:, 2] >= pcr[2]) & (points[:, 2] <= pcr[5])
+        points_in_range = in_range.sum()
+        
+        self.get_logger().info(f"📊 Points: {len(points)} total, {points_in_range} in detect range | "
+                               f"X:[{x_min:.1f},{x_max:.1f}] Y:[{y_min:.1f},{y_max:.1f}] Z:[{z_min:.1f},{z_max:.1f}]")
+
+        # Transform points: shift X into KITTI detection range
+        points_shifted = points.copy()
+        points_shifted[:, 0] += X_OFFSET  # Now X:[20, 38] instead of [-15, 3]
+        
+        # Voxelization (on shifted points)
+        points_tensor = torch.from_numpy(points_shifted).float().to(self.device)
         voxels, coords, num_points = self.voxel_generator(points_tensor)
 
         # Prepare input dict
@@ -100,13 +147,24 @@ class LidarDetectionNode(Node):
         with torch.no_grad():
             pred_dicts, _ = self.model.forward(input_dict)
 
+        # Debug: show raw prediction stats
+        raw_boxes = pred_dicts[0]['pred_boxes']
+        raw_scores = pred_dicts[0]['pred_scores']
+        if len(raw_scores) > 0:
+            max_score = raw_scores.max().item()
+            self.get_logger().info(f"🔍 Raw predictions: {len(raw_boxes)} boxes, max score: {max_score:.3f}")
+        else:
+            self.get_logger().info(f"🔍 Raw predictions: 0 boxes")
+
         marker_array = MarkerArray()
         marker_id = 0
 
+        DETECTION_THRESHOLD = 0.1  # Lowered from 0.25 for debugging
+        
         for box, cls, score in zip(pred_dicts[0]['pred_boxes'],
                                    pred_dicts[0]['pred_labels'],
                                    pred_dicts[0]['pred_scores']):
-            if score < 0.25:
+            if score < DETECTION_THRESHOLD:
                 continue
 
             # Cube Marker
@@ -120,6 +178,8 @@ class LidarDetectionNode(Node):
             marker.action = Marker.ADD
 
             x, y, z, dx, dy, dz, heading = box.cpu().numpy()
+            # Transform box coordinates back to original LiDAR frame
+            x = x - X_OFFSET
             marker.pose.position.x = float(x)
             marker.pose.position.y = float(y)
             marker.pose.position.z = float(z)
