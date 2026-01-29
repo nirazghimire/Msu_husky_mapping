@@ -11,7 +11,7 @@ except ImportError:
     print("Warning: pointnet2_utils not found")
 
 # Monkey patch functions that depend on CUDA
-iou3d_nms_utils.nms_gpu = None
+# iou3d_nms_utils.nms_gpu = None
 roiaware_pool3d_utils.roiaware_pool3d_gpu = None
 if pointnet2_utils is not None:
     pointnet2_utils.PointNetSetAbstraction = None

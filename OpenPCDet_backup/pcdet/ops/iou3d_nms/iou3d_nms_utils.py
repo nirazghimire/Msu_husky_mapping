@@ -93,6 +93,9 @@ def nms_gpu(boxes, scores, thresh, pre_maxsize=None, **kwargs):
 
 def nms_normal_gpu(boxes, scores, thresh, **kwargs):
     return nms_gpu(boxes, scores, thresh, **kwargs)
+
+def nms_cpu(boxes, scores, thresh, pre_maxsize=None, **kwargs):
+    return nms_gpu(boxes, scores, thresh, pre_maxsize, **kwargs)
     
 def paired_boxes_iou3d_gpu(boxes_a, boxes_b):
     # Dummy fallback
