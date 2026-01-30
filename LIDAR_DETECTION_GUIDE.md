@@ -24,7 +24,35 @@ This guide explains how to run real-time **360° 3D object detection** on the Ou
 
 ---
 
-## 3. Quick Start
+## 3. Installation & Setup
+
+### 1. Install Dependencies
+```bash
+sudo apt update
+sudo apt install -y python3-pip ros-humble-desktop
+pip3 install torch==1.10.1+cpu torchvision==0.11.2+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html
+pip3 install spconv-cu102 # Compatible with most setups or use 'spconv' if available
+# OR for CPU only usage sometimes newer spconv works, but strict version matching is key.
+# Recommended for this repo:
+pip3 install -r src/OpenPCDet_backup/requirements.txt
+```
+
+### 2. Download Model Weights
+The model file is too large for GitHub. You must download it manually.
+1. Download `pp_multihead_nds5823_updated.pth`.
+2. Place it in the folder:
+   ```bash
+   src/OpenPCDet_backup/pretrained_models/
+   ```
+
+### 3. Build the Workspace
+```bash
+cd ~/ros2_ws
+colcon build --symlink-install
+source install/setup.bash
+```
+
+## 4. Quick Start
 
 ### Step 1: Start the LiDAR Driver (or Replay)
 
@@ -59,7 +87,7 @@ You should see logs indicating the model loaded and is processing frames (e.g., 
 
 ---
 
-## 4. Troubleshooting
+## 5. Troubleshooting
 
 ### "Checkpoint file not found"
 The model weights are not included in the git repo to save space. You must download `pp_multihead_nds5823_updated.pth` and place it in `src/OpenPCDet_backup/pretrained_models/`.
@@ -79,7 +107,7 @@ The model expects the LiDAR to be at `(0,0,0)`. If your `os_sensor` frame is def
 
 ---
 
-## 5. Technical Details
+## 6. Technical Details
 
 *   **Model Config:** `src/lidar_object_detection/config/nuscenes_pointpillar.yaml`
 *   **Code:** `src/lidar_object_detection/lidar_object_detection/detection_node.py`
