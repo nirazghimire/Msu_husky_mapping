@@ -43,7 +43,7 @@ ros2 launch ouster_ros replay_pcap.launch.xml metadata:=/path/to/data.json pcap_
 In a new terminal:
 ```bash
 source install/setup.bash
-ros2 run lidar_object_detection lidar_detection_node
+ros2 launch lidar_object_detection detection.launch.py
 ```
 
 You should see logs indicating the model loaded and is processing frames (e.g., `🔍 NuScenes Preds: 155 boxes`).
