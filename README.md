@@ -1,76 +1,55 @@
-# MSU Husky Mapping & Object Detection
+# MSU Husky: Autonomous Perception & Mapping Stack
 
-This repository contains the ROS2 software stack for the MSU Husky robot, including LiDAR mapping and a custom **CPU-optimized** 3D object detection pipeline.
+![ROS2](https://img.shields.io/badge/ROS2-Humble-blue.svg) ![Platform](https://img.shields.io/badge/Platform-Clearpath%20Husky-orange.svg) ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
-## Features
+## Overview
 
-*   **LiDAR Mapping**: Integration with FAST_LIO and Ouster LiDAR for real-time visual-inertial mapping.
-*   **CPU Lidar Object Detection**: A custom-patched `OpenPCDet` implementation that runs real-time 3D object detection (NuScenes PointPillars) **entirely on the CPU** without requiring CUDA/GPU.
-*   **Production-Grade Visualization**: RViz2 configuration optimized for publication-quality screenshots with professional styling.
+This repository hosts the specialized autonomy software for the **MSU Husky** research platform. It features a high-performance, **CPU-optimized** perception stack capable of real-time 360° 3D object detection and simultaneous visual-inertial mapping (SLAM) using a single Ouster LiDAR sensor.
 
-## LiDAR Mapping with FAST_LIO
+Designed for robust operation in unstructured environments without requiring heavy GPU compute.
 
-Located in `src/FAST_LIO_ROS2/`, this package provides real-time visual-inertial odometry and mapping for Ouster LiDAR.
+## Core Capabilities
 
-### Quick Start
+### 🧠 CPU-Optimized 3D Object Detection
+- **Model**: Custom PointPillars architecture trained on NuScenes.
+- **Hardware**: Runs entirely on standard i7/i9 CPUs (No GPU required).
+- **Performance**: Real-time 360° detection of 10+ classes (Cars, Pedestrians, Trucks, etc.).
+- **Integration**: Seamless ROS2 `MarkerArray` output for navigation stacks.
+
+### 🗺️ Real-Time Mapping (SLAM)
+- **Engine**: FAST_LIO (Fast LiDAR-Inertial Odometry).
+- **Accuracy**: High-fidelity dense point cloud generation with drift correction.
+- **Robustness**: Handles aggressive motion and unstructured terrain.
+
+## 🚀 Getting Started
+
+We have prepared a comprehensive, step-by-step guide for new users to set up the environment, install dependencies, and run the full stack from scratch.
+
+👉 **[READ THE SETUP GUIDE HERE](./LIDAR_DETECTION_GUIDE.md)** 👈
+
+## Quick Commands
+
+**Launch Object Detection:**
 ```bash
-# Launch Ouster sensor driver
-ros2 launch ouster_ros sensor.launch.xml sensor_hostname:=<YOUR_SENSOR_IP> viz:=false
-
-# In a new terminal, launch FAST_LIO mapping
-ros2 launch lidar_mapping_launch full_pipeline.launch.py
-
-# Visualize in RViz2
-rviz2 -d install/fast_lio/share/fast_lio/rviz/fastlio.rviz
+ros2 launch lidar_object_detection detection.launch.py
 ```
 
-### Key Features
-*   **Ouster Support**: Compatible with Ouster OS-1 and other LiDARs via PCL point struct registration.
-*   **Real-Time Mapping**: Generates incremental point cloud maps with pose optimization.
-*   **Publication-Ready Visualization**: Flat-color, dark-background RViz configuration with professional styling for research papers.
-*   **Fixed Frame**: Uses `map` as global reference frame for consistent multi-robot coordinate systems.
+**Launch Mapping:**
+```bash
+ros2 launch lidar_mapping_launch full_pipeline.launch.py
+```
 
-### Recent Fixes (January 2026)
-- **PCL Field Matching**: Fixed "Failed to find match for field 'ring'" warnings by aligning FAST_LIO's point struct definition (uint16_t) with Ouster SDK official definition.
-- **RViz Configuration**: Updated `fastlio.rviz` with publication-quality settings:
-  - Dark background (RGB: 10, 10, 10) for improved contrast
-  - Flat gray point coloring (no rainbow artifacts)
-  - Persistent point clouds (decay time = 0)
-  - Optimized point size (0.04-0.05 m) for clarity in screenshots
-  - Subtle grid overlay (RGB: 80, 80, 80)
-
-### Saving the Map
-To save the generated point cloud map (PCD file):
+**Save Map:**
 ```bash
 ros2 service call /map_save std_srvs/srv/Trigger
 ```
-The map will be saved to `test.pcd` in the workspace directory (or the path specified in `config/ouster64.yaml`).
 
-See [LIDAR_DETECTION_GUIDE.md](./LIDAR_DETECTION_GUIDE.md) for detailed mapping setup.
+## Repository Structure
 
-## CPU Object Detection Node
+- `lidar_object_detection/`: The core CPU detection node.
+- `lidar_mapping_launch/`: Unified launch files for mapping pipelines.
+- `FAST_LIO_ROS2/`: The underlying SLAM algorithm implementation.
+- `OpenPCDet_backup/`: The inference engine patches and utilities.
 
-Located in `lidar_object_detection`, this node performs 3D detection on Ouster LiDAR point clouds.
-
-### Key Capabilities
-*   **Model**: PointPillars (pretrained on **NuScenes**).
-*   **Classes**: 10 classes (Car, Truck, Bus, Pedestrian, Barrier, Traffic Cone, etc.).
-*   **View**: 360° detection (unlike the previous front-view only model).
-*   **Hardware**: optimized for CPU execution.
-*   **Input Topic**: `/ouster/points`
-*   **Output Topic**: `/detections` (Visualization Markers)
-
-### How to Run
-
-1.  **Launch the Detection Node**:
-    ```bash
-    ros2 launch lidar_object_detection detection.launch.py
-    ```
-
-2.  **Visualization**:
-    Open RViz2:
-    *   **Fixed Frame**: `os_sensor` (or `lidar_link`)
-    *   **Add**: `MarkerArray` -> Topic: `/detections`
-    *   **Add**: `PointCloud2` -> Topic: `/ouster/points` (Color Transformer: Intensity)
-
-For detailed setup instructions, troubleshooting, and dependencies, please refer to **[LIDAR_DETECTION_GUIDE.md](./LIDAR_DETECTION_GUIDE.md)**.
+---
+*Developed by the MSU Autonomy Research Team | 2026*

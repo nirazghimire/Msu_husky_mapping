@@ -1,128 +1,175 @@
-# LiDAR Object Detection - Setup Guide
+# LiDAR Detection & Mapping - Complete Setup Guide
 
-This guide explains how to run real-time **360° 3D object detection** on the Ouster LiDAR using a CPU-only laptop. The system uses a **NuScenes-trained PointPillars model** to detect 10 different classes of objects.
-
----
-
-## 1. Overview
-
-**Features:**
-*   **360° Detection:** Detects objects all around the robot (unlike forward-only models).
-*   **CPU Optimized:** Runs efficiently on a standard laptop CPU.
-*   **10 Classes:** `car`, `truck`, `bus`, `trailer`, `construction_vehicle`, `pedestrian`, `motorcycle`, `bicycle`, `barrier`, `traffic_cone`.
-
-**Input:** Point cloud from Ouster LiDAR (`/ouster/points`)  
-**Output:** 3D bounding boxes as ROS2 markers (`/detections`)
+This comprehensive guide will walk you through setting up the **MSU Husky** software stack from scratch. By the end, you will be able to run **360° 3D Object Detection** and **Real-Time Mapping** on the Husky robot (or your local machine).
 
 ---
 
-## 2. Requirements
+## 1. Prerequisites
 
-*   **OS:** Ubuntu 22.04 (ROS2 Humble)
-*   **Hardware:** Ouster LiDAR (tested with OS-1) or Recorded PCAP data.
-*   **Weights File:** `pp_multihead_nds5823_updated.pth` (Must be in `src/OpenPCDet_backup/pretrained_models/`)
+Before you begin, ensure you have the following:
+
+- **Operating System**: Ubuntu 22.04 LTS (Jammy Jellyfish).
+- **ROS Distribution**: ROS2 Humble Hawksbill.
+- **Hardware**:
+    - Laptop/PC (No GPU required, but AVX2 support recommended for performance).
+    - Ouster LiDAR (OS-1-64 recommended) *OR* ensure you have recorded PCAP data.
+- **Tools**: `git`, `python3-pip`, `wget`.
+
+### Install ROS2 Humble (If not installed)
+If you haven't installed ROS2 Humble yet, follow the [official guide](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debians.html) or run:
+```bash
+sudo apt update && sudo apt install software-properties-common
+sudo add-apt-repository universe
+sudo apt update && sudo apt install curl -y
+sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
+sudo apt update
+sudo apt install ros-humble-desktop
+sudo apt install ros-dev-tools
+```
 
 ---
 
-## 3. Installation & Setup
+## 2. Workspace Setup
 
-### 1. Install Dependencies
+### 1. Clone the Repository
+Open a terminal and create your workspace:
+```bash
+mkdir -p ~/ros2_ws/src
+cd ~/ros2_ws/src
+git clone https://github.com/nirazghimire/Msu_husky_mapping.git .
+```
+
+### 2. Install Dependencies
+Install the required system, Python, and ROS dependencies:
+
+**System Requirements:**
 ```bash
 sudo apt update
-sudo apt install -y python3-pip ros-humble-desktop
-pip3 install torch==1.10.1+cpu torchvision==0.11.2+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html
-pip3 install spconv-cu102 # Compatible with most setups or use 'spconv' if available
-# OR for CPU only usage sometimes newer spconv works, but strict version matching is key.
-# Recommended for this repo:
-pip3 install -r src/OpenPCDet_backup/requirements.txt
+sudo apt install -y python3-pip ros-humble-desktop ros-humble-pcl-ros ros-humble-perception-pcl ros-humble-gtsam
 ```
 
-### 2. Download Model Weights
-The model file is too large for GitHub. You must download it manually.
-1. Download `pp_multihead_nds5823_updated.pth`.
-2. Place it in the folder:
-   ```bash
-   src/OpenPCDet_backup/pretrained_models/
-   ```
+**Python Requirements (for Object Detection):**
+The object detection pipeline uses a custom `OpenPCDet` implementation.
+```bash
+# Core torch libraries (CPU version)
+pip3 install torch==1.10.1+cpu torchvision==0.11.2+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html
 
-### 3. Build the Workspace
+# Install project-specific requirements
+cd ~/ros2_ws/src
+pip3 install -r OpenPCDet_backup/requirements.txt
+```
+
+> **Note on spconv**: The `requirements.txt` should install the compatible `spconv` version. If you face issues, `pip3 install spconv-cu102` often works for CPU-only inference on compatible architectures.
+
+---
+
+## 3. Model Weights Setup (Critical)
+
+The object detection model weights are **NOT** included in the repository due to size limits. You must download them manually.
+
+1.  **Download** the weights file: `pp_multihead_nds5823_updated.pth`
+    *   (Ask your team lead for the download link if not provided separately).
+2.  **Move** the file to the correct directory:
+    ```bash
+    mv /path/to/downloaded/pp_multihead_nds5823_updated.pth ~/ros2_ws/src/OpenPCDet_backup/pretrained_models/
+    ```
+
+**Verification**:
+Ensure the file exists:
+```bash
+ls ~/ros2_ws/src/OpenPCDet_backup/pretrained_models/
+# Output should show: pp_multihead_nds5823_updated.pth
+```
+
+---
+
+## 4. Building the Workspace
+
+Build the entire software stack using `colcon`.
+
 ```bash
 cd ~/ros2_ws
-colcon build --symlink-install
-source install/setup.bash
+colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
 ```
 
-## 4. Quick Start
+*This may take a few minutes.*
 
-### Step 1: Start the LiDAR Driver (or Replay)
-
-**Option A: Live Sensor**
-```bash
-ros2 launch ouster_ros sensor.launch.xml sensor_hostname:=<YOUR_SENSOR_HOSTNAME> viz:=false
-```
-
-**Option B: Recorded Data (PCAP)**
-```bash
-ros2 launch ouster_ros replay_pcap.launch.xml metadata:=/path/to/data.json pcap_file:=/path/to/data.pcap viz:=false loop:=true
-```
-
-### Step 2: Start Object Detection
-
-In a new terminal:
+Once finished, source the workspace:
 ```bash
 source install/setup.bash
+# Tip: Add this to your ~/.bashrc to auto-source it
+# echo "source ~/ros2_ws/install/setup.bash" >> ~/.bashrc
+```
+
+---
+
+## 5. Running the System
+
+You can run the modules individually or together.
+
+### A. Start the LiDAR Sensor
+First, we need live data from the Ouster.
+
+```bash
+# Replace <SENSOR_IP> with your LiDAR's IP (e.g., 192.168.1.100)
+ros2 launch ouster_ros sensor.launch.xml sensor_hostname:=<SENSOR_IP> viz:=false
+```
+*If using recorded data, launch your replay script or play the rosbag.*
+
+### B. Run Object Detection (The "Eyes")
+This node will detect objects (Cars, Pedestrians, etc.) in 3D space.
+
+**In a new terminal:**
+```bash
+source ~/ros2_ws/install/setup.bash
 ros2 launch lidar_object_detection detection.launch.py
 ```
+*Wait until you see logs say: `🔍 NuScenes Preds: ...`*
 
-You should see logs indicating the model loaded and is processing frames (e.g., `🔍 NuScenes Preds: 155 boxes`).
+### C. Run Mapping (The "Memory")
+This node builds a consistent map of the environment as you move.
 
-### Step 3: Visualization (RViz2)
-
-1.  Run `rviz2`.
-2.  **Global Options (Top Left):**
-    *   **Fixed Frame:** Set to `os_sensor` (or `lidar_link`). *Do NOT use 'map'.*
-3.  **Add Visualizations:**
-    *   **PointCloud2:** Topic `/ouster/points` -> Color Transformer: `Intensity`.
-    *   **MarkerArray:** Topic `/detections`.
-
----
-
-## 5. Troubleshooting
-
-### "Checkpoint file not found"
-The model weights are not included in the git repo to save space. You must download `pp_multihead_nds5823_updated.pth` and place it in `src/OpenPCDet_backup/pretrained_models/`.
-
-### "No executable found"
-Run the build command again:
+**In a new terminal:**
 ```bash
-colcon build --packages-select lidar_object_detection
-source install/setup.bash
+source ~/ros2_ws/install/setup.bash
+ros2 launch lidar_mapping_launch full_pipeline.launch.py
 ```
 
-### Blinking Markers
-On CPU, inference can be slow (~2-3 FPS). We set the marker lifetime to 1.5 seconds to bridge the gap between frames. If they still blink, you may need to increase the lifetime in `detection_node.py` further.
+---
 
-### Wrong Coordinates / Boxes Underground
-The model expects the LiDAR to be at `(0,0,0)`. If your `os_sensor` frame is defined differently in your URDF, you might see offsets. Ensure `Fixed Frame` is set to the sensor frame itself for debugging.
+## 6. Visualization (Seeing it all)
+
+We have a pre-configured RViz setup to see everything at once.
+
+1.  **Open RViz2:**
+    ```bash
+    rviz2
+    ```
+2.  **Load Config:**
+    *   File -> Open Config -> Navigate to `src/FAST_LIO_ROS2/config/fastlio.rviz` (or manually configure as below).
+
+**Manual Configuration Checklist:**
+*   **Fixed Frame**: `os_sensor` (for live view) or `map` (if mapping).
+*   **PointCloud2**: Topic `/ouster/points` -> Style: Points -> Color: Intensity.
+*   **MarkerArray**: Topic `/detections` -> Show all boxes.
+*   **PointCloud2 (Map)**: Topic `/cloud_registered` -> The built map.
 
 ---
 
-## 6. Technical Details
+## 7. Saving Data
 
-*   **Model Config:** `src/lidar_object_detection/config/nuscenes_pointpillar.yaml`
-*   **Code:** `src/lidar_object_detection/lidar_object_detection/detection_node.py`
-*   **Intensity:** Ouster intensity is normalized (divided by 255) to match NuScenes data distribution.
-*   **NMS:** Uses a custom CPU-based Non-Maximum Suppression implementation to avoid CUDA dependencies.
-
-## 7. Saving the Map (FAST_LIO)
-
-If you are running the FAST_LIO mapping node simultaneously, you can save the constructed point cloud map using the ROS2 service:
-
+### Saving the Map
+To save the built map to a `.pcd` file:
 ```bash
 ros2 service call /map_save std_srvs/srv/Trigger
 ```
-
-The map will be saved to `test.pcd` in the workspace directory (or the path defined in `config/ouster64.yaml`).
+The file `test.pcd` will be saved in your workspace root or the configured output directory.
 
 ---
-*Last Updated: January 2026*
+
+## Troubleshooting
+
+- **"ModuleNotFoundError: No module named 'pcdet'"**: You forgot to source the workspace (`source install/setup.bash`).
+- **"Checkpoint not found"**: You skipped **Section 3**. The model weights are missing.
+- **LiDAR Timestamps**: If detection boxes are "lagging" or not appearing, check time synchronization. Ensure PTP is active if using a real sensor.
