@@ -114,5 +114,15 @@ The model expects the LiDAR to be at `(0,0,0)`. If your `os_sensor` frame is def
 *   **Intensity:** Ouster intensity is normalized (divided by 255) to match NuScenes data distribution.
 *   **NMS:** Uses a custom CPU-based Non-Maximum Suppression implementation to avoid CUDA dependencies.
 
+## 7. Saving the Map (FAST_LIO)
+
+If you are running the FAST_LIO mapping node simultaneously, you can save the constructed point cloud map using the ROS2 service:
+
+```bash
+ros2 service call /map_save std_srvs/srv/Trigger
+```
+
+The map will be saved to `test.pcd` in the workspace directory (or the path defined in `config/ouster64.yaml`).
+
 ---
 *Last Updated: January 2026*

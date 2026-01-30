@@ -39,6 +39,13 @@ rviz2 -d install/fast_lio/share/fast_lio/rviz/fastlio.rviz
   - Optimized point size (0.04-0.05 m) for clarity in screenshots
   - Subtle grid overlay (RGB: 80, 80, 80)
 
+### Saving the Map
+To save the generated point cloud map (PCD file):
+```bash
+ros2 service call /map_save std_srvs/srv/Trigger
+```
+The map will be saved to `test.pcd` in the workspace directory (or the path specified in `config/ouster64.yaml`).
+
 See [LIDAR_DETECTION_GUIDE.md](./LIDAR_DETECTION_GUIDE.md) for detailed mapping setup.
 
 ## CPU Object Detection Node
