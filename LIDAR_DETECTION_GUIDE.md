@@ -125,7 +125,7 @@ This node will detect objects (Cars, Pedestrians, etc.) in 3D space.
 source ~/ros2_ws/install/setup.bash
 ros2 launch lidar_object_detection detection.launch.py
 ```
-*Wait until you see logs say: `🔍 NuScenes Preds: ...`*
+*Wait until you see logs say: `NuScenes Preds: ...`*
 
 ### C. Run Mapping (The "Memory")
 This node builds a consistent map of the environment as you move.

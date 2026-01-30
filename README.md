@@ -10,22 +10,22 @@ Designed for robust operation in unstructured environments without requiring hea
 
 ## Core Capabilities
 
-### 🧠 CPU-Optimized 3D Object Detection
+### CPU-Optimized 3D Object Detection
 - **Model**: Custom PointPillars architecture trained on NuScenes.
 - **Hardware**: Runs entirely on standard i7/i9 CPUs (No GPU required).
 - **Performance**: Real-time 360° detection of 10+ classes (Cars, Pedestrians, Trucks, etc.).
 - **Integration**: Seamless ROS2 `MarkerArray` output for navigation stacks.
 
-### 🗺️ Real-Time Mapping (SLAM)
+### Real-Time Mapping (SLAM)
 - **Engine**: FAST_LIO (Fast LiDAR-Inertial Odometry).
 - **Accuracy**: High-fidelity dense point cloud generation with drift correction.
 - **Robustness**: Handles aggressive motion and unstructured terrain.
 
-## 🚀 Getting Started
+## Getting Started
 
 We have prepared a comprehensive, step-by-step guide for new users to set up the environment, install dependencies, and run the full stack from scratch.
 
-👉 **[READ THE SETUP GUIDE HERE](./LIDAR_DETECTION_GUIDE.md)** 👈
+**[READ THE SETUP GUIDE HERE](./LIDAR_DETECTION_GUIDE.md)**
 
 ## Quick Commands
 
